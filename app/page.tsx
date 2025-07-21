@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from 'next/link';
 
 export default function Home() {
   return (
@@ -49,6 +50,10 @@ export default function Home() {
           >
             Read our docs
           </a>
+          <Link href="/login">
+            <button className="px-4 py-2 bg-green-500 text-white rounded">进入应用
+          </button>
+          </Link>
         </div>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
