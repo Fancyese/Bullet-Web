@@ -28,15 +28,25 @@ const STATUS_LABEL: Record<string, string> = {
 
 /* 点击循环：· → DOING → × → · */
 const nextStatus = (cur: string) => {
-  if (cur === '·') return 'DOING';
-  if (cur === 'DOING') return '×';
-  if (cur === '×') return '·';
-  return '·';
+  const order = ['·', 'DOING', '×', '@', '~'];
+  const idx = order.indexOf(cur);
+  return order[(idx + 1) % order.length];
+};
+
+// 显示用的短符号
+const STATUS_ICON: Record<string, string> = {
+  '·': '·',
+  DOING: 'ING',
+  '×': '×',
+  '@': '/',
+  '~': '~',
 };
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);   // 正在编辑的任务 id
+  const [assignName, setAssignName] = useState('');
 
   const fetchTasks = async () => {
     const { data } = await supabase
@@ -50,8 +60,17 @@ export default function TasksPage() {
     if (!newTask.trim()) return;
     const user = (await supabase.auth.getUser()).data.user;
     if (!user) return alert('请先登录！');
+
+    // 解析 @人名
+    const match = newTask.match(/^(.+?)@(\S+)$/);
+    const content   = match ? match[1].trim() : newTask.trim();
+    const assigned  = match ? match[2].trim() : null;
+    const status    = assigned ? '@' : '·';   // ← 关键：有人名就设为已分配
+
     await supabase.from('tasks').insert({
-      content: newTask.trim(),
+      content,
+      assigned_to: assigned,
+      status,
       user_id: user.id,
     });
     setNewTask('');
@@ -59,12 +78,32 @@ export default function TasksPage() {
   };
 
   const toggleStatus = async (id: string, cur: string) => {
-    await supabase.from('tasks').update({ status: nextStatus(cur) }).eq('id', id);
+    const next = nextStatus(cur);
+
+    // 如果下一状态是“已分配”，直接切换并打开行内输入
+    if (next === '@') {
+      await supabase.from('tasks').update({ status: '@', assigned_to: '' }).eq('id', id);
+      setEditingId(id);          // 打开输入框
+      setAssignName('');         // 清空旧值
+    } else {
+      // 离开已分配状态
+      await supabase
+        .from('tasks')
+        .update({ status: next, assigned_to: null })
+        .eq('id', id);
+      setEditingId(null);
+    }
     fetchTasks();
   };
 
   const deleteTask = async (id: string) => {
     await supabase.from('tasks').delete().eq('id', id);
+    fetchTasks();
+  };
+
+  const saveAssign = async (id: string) => {
+    await supabase.from('tasks').update({ assigned_to: assignName.trim() }).eq('id', id);
+    setEditingId(null);
     fetchTasks();
   };
 
@@ -96,45 +135,43 @@ export default function TasksPage() {
       {/* 任务列表 */}
       <ul className="space-y-2">
         {tasks.map((t) => (
-          <li
-            key={t.id}
-            className="flex items-center gap-3 border-b pb-2"
-          >
+          <li key={t.id} className="flex items-center gap-3 border-b pb-2">
             {/* 状态符号 */}
             <span
-              className="cursor-pointer text-xl font-mono w-6 text-center"
+              className="cursor-pointer text-xl font-mono w-8 text-center"
               onClick={() => toggleStatus(t.id, t.status)}
               title={STATUS_LABEL[t.status]}
             >
-              {t.status}
+              {STATUS_ICON[t.status]}
             </span>
 
-            {/* 内容 */}
+            {/* 任务内容 */}
             <span
-              className={
-                t.status === '~' ? 'line-through text-gray-400 flex-1' : 'flex-1'
-              }
+              className={t.status === '~' ? 'line-through text-gray-400 flex-1' : 'flex-1'}
             >
               {t.content}
-              {t.assigned_to && (
-                <span className="ml-2 text-sm text-indigo-500">
-                  @{t.assigned_to}
-                </span>
-              )}
             </span>
 
-            {/* 截止日期 */}
-            {t.due_date && (
-              <span className="text-sm text-gray-500">
-                {format(new Date(t.due_date), 'MM/dd')}
-              </span>
+            {/* 分配人名输入框（仅当 status=@ 且正在编辑） */}
+            {t.status === '@' && editingId === t.id && (
+              <input
+                className="border px-2 rounded w-20 text-sm"
+                value={assignName}
+                onChange={(e) => setAssignName(e.target.value)}
+                onBlur={() => saveAssign(t.id)}
+                onKeyDown={(e) => e.key === 'Enter' && saveAssign(t.id)}
+                placeholder="人名"
+                autoFocus
+              />
+            )}
+
+            {/* 已分配但不在编辑状态，仅显示人名 */}
+            {t.status === '@' && editingId !== t.id && t.assigned_to && (
+              <span className="text-sm text-indigo-500">@{t.assigned_to}</span>
             )}
 
             {/* 删除按钮 */}
-            <button
-              className="text-red-500 text-sm ml-auto"
-              onClick={() => deleteTask(t.id)}
-            >
+            <button className="text-red-500 text-sm ml-auto" onClick={() => deleteTask(t.id)}>
               删除
             </button>
           </li>
