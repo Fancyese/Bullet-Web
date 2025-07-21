@@ -54,6 +54,10 @@ export default function Home() {
             <button className="px-4 py-2 bg-green-500 text-white rounded">进入应用
           </button>
           </Link>
+          <Link href="/tasks">
+            <button className="px-4 py-2 bg-indigo-500 text-white rounded ml-2">任务列表
+          </button>
+          </Link>
         </div>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
