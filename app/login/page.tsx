@@ -1,4 +1,7 @@
 'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -7,11 +10,31 @@ const supabase = createClient(
 );
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        router.push('/dashboard');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [router]);
+
   const signIn = async () => {
     const email = prompt('请输入邮箱');
     if (!email) return;
-    await supabase.auth.signInWithOtp({ email });
-    alert('请查看邮箱中的登录链接');
+
+    const { error } = await supabase.auth.signInWithOtp({ email });
+
+    if (error) {
+      alert('登录失败，请重试: ' + error.message);
+    } else {
+      alert('已发送登录链接，请查收邮箱');
+    }
   };
 
   return (
