@@ -58,6 +58,10 @@ export default function Home() {
             <button className="px-4 py-2 bg-indigo-500 text-white rounded ml-2">任务列表
           </button>
           </Link>
+          <Link href="/week">
+            <button className="px-4 py-2 bg-purple-500 text-white rounded ml-2">周视图
+          </button>
+          </Link>
         </div>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
